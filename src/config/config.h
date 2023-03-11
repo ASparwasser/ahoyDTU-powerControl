@@ -12,8 +12,8 @@
 //-------------------------------------
 
 // Fallback WiFi Info
-#define FB_WIFI_SSID    "SparwasserHome"
-#define FB_WIFI_PWD     "15603179900240994761"
+#define FB_WIFI_SSID    "YOUR_WIFI_SSID"
+#define FB_WIFI_PWD     "YOUR_WIFI_PWD"
 
 
 // Access Point Info

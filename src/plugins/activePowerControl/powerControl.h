@@ -17,10 +17,12 @@ class powerControl{
     /* Implemented memeber functions. */
     void setup(settings_t *config);
     void tickPowerControlLoop_1s(void);
+    void runAsyncClient(void);
+
 
     private:
-
     settings_t *mConfig;
+    
 
 };
 
