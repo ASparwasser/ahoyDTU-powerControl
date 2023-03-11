@@ -31,6 +31,8 @@
 #include "publisher/pubMqtt.h"
 #include "publisher/pubSerial.h"
 
+#include "plugins/activePowerControl/powerControl.h"
+
 
 // convert degrees and radians for sun calculation
 #define SIN(x) (sin(radians(x)))
@@ -243,6 +245,7 @@ class app : public IApp, public ah::Scheduler {
         #if defined(ENA_NOKIA) || defined(ENA_SSD1306)
         MonoDisplayType mMonoDisplay;
         #endif
+        powerControl activePowerLimiter;
 };
 
 #endif /*__APP_H__*/
