@@ -19,11 +19,23 @@ class powerControl{
     void tickPowerControlLoop_1s(void);
     void runAsyncClient(void);
 
+    static void client_onError(void *arg, AsyncClient *client, err_t error);
+    static void client_onConnect(void *arg, AsyncClient *client);
+    static void client_onDisconnect(void *arg, AsyncClient *client);
+    static void client_onData(void * arg, AsyncClient * c, void * data, size_t len);
+
 
     private:
     settings_t *mConfig;
-    
+    AsyncClient * aClient = NULL;
+    bool connectionOK = false;
+    uint16_t shellycontent_index;
+    char shellycontent[1500];
+    static const char* searchTag;
+    uint16_t lastPowerValue;
+
 
 };
+
 
 #endif
