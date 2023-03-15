@@ -25,13 +25,13 @@ class powerControl{
     static void client_onData(void * arg, AsyncClient * c, void * data, size_t len);
 
 
-    private:
+    //private:
     settings_t *mConfig;
     AsyncClient * aClient = NULL;
     bool connectionOK = false;
     uint16_t shellycontent_index;
     char shellycontent[1500];
-    static const char* searchTag;
+
     uint16_t lastPowerValue;
 
 

@@ -7,7 +7,8 @@
 #include "../../utils/dbg.h"
 #include <string>
 
-const char* powerControl::searchTag = "\"total_power\":";
+enum{SEARCH_TAG_LEN = 12};
+static const char searchTag[SEARCH_TAG_LEN] = "total_power";
 
 
 void powerControl::setup(settings_t* config)
@@ -16,6 +17,8 @@ void powerControl::setup(settings_t* config)
     mConfig = config;
 
     lastPowerValue = 255;
+
+    shellycontent_index = 0;
 }
 
 void powerControl::tickPowerControlLoop_1s(void)
@@ -26,7 +29,8 @@ void powerControl::tickPowerControlLoop_1s(void)
 
     if(called%10 == 0)
     {
-        DBGPRINT(F("tickPowerControlLoop_1s is called:  "));
+        DBGPRINT(F("tickPowerControlLoop_1s is called:  \n"));
+        DBGPRINT(String((unsigned long long)this));
         DBGPRINT(String(called));
         DBGPRINT(F("times"));
 
@@ -63,16 +67,11 @@ void powerControl::tickPowerControlLoop_1s(void)
 
                 return;
             }
-
-            //send the request
-            aClient->write("GET /status HTTP/1.1\r\n");
-            aClient->write("Host: 192.168.178.158\r\n");
-            aClient->write("\r\n");
         }
 
     }
 
-    DBGPRINT(String(lastPowerValue));
+    // DBGPRINT(String(lastPowerValue));
 }
 
 void powerControl::client_onError(void* arg, AsyncClient* client, err_t error)
@@ -95,86 +94,91 @@ void powerControl::client_onConnect(void* arg, AsyncClient* client)
     self->connectionOK = true;
     DBGPRINTLN(F("Connected"));
 
+    //send the request
+    self->aClient->write("GET /status HTTP/1.1\r\n");
+    self->aClient->write("Host: 192.168.178.158\r\n");
+    self->aClient->write("\r\n");
+
 }
 
 void powerControl::client_onDisconnect(void* arg, AsyncClient* client)
 {
     powerControl* self = static_cast<powerControl*>(arg);
 
-    DBGPRINTLN(F("Disconnected"));
-
-    size_t i;
-    for (i = 0; i < self->shellycontent_index; i++)
-    {
-        /* Search inside long string for our value! */
-        if (0 == memcmp((void*)&searchTag[0], (void*)&self->shellycontent[i], sizeof(searchTag)))
-        {
-            DBGPRINTLN(F("Checkpoint 1! "));
-            /* 4 places because of watt*1000! */
-            char strPower[5];
-            memcpy((void*)(&self->shellycontent[i + sizeof(searchTag)]),(void*) &strPower[0], sizeof(strPower));
-            strPower[4] = '\0'; // Add null-terminator
-
-            DBGPRINTLN(F("Checkpoint 2! "));
-
-            /* Perform some verification actions. */
-            bool isValid = true;
-            for (int j = 0; j < 4; j++)
-            {
-                if (!isdigit(strPower[j]))
-                {
-                    strPower[j] = '\0'; // Add null-terminator
-                    if (j < 2)
-                    {
-                        /* Power value is tooo low. */
-                        isValid = false;
-                    }
-                    break;
-                }
-            }
-
-            DBGPRINTLN(F("Checkpoint 3! "));
-
-            if (true == isValid )
-            {
-                /* Convert strPower to a uint16_t number. */
-                self->lastPowerValue = std::strtoul(strPower, nullptr, 10);
-            }
-            else
-            {
-                /* Power value is tooo low. Set it to 0. */
-                self->lastPowerValue = 0;
-            }
-        }
-    }
-    self->shellycontent_index = 0;
-
-    DBGPRINT(String(self->shellycontent) + '\n');
-    DBGPRINT(String(self->lastPowerValue));
-
     self->connectionOK = false;
     self->aClient = NULL;
-    delete client;
 }
 
 void powerControl::client_onData(void * arg, AsyncClient * c, void * data, size_t len)
 {
     powerControl* self = static_cast<powerControl*>(arg);
 
+    DBGPRINTLN(F("\n OnData"));
+
     uint8_t * d = (uint8_t*)data;
-    char ch;
 
-    size_t i;
-    for (i = self->shellycontent_index; i < len + self->shellycontent_index; i++)
+    uint16_t i;
+    enum{STRING_POWER_LEN = 5};
+    char strPower[STRING_POWER_LEN];
+    bool isValid = false;
+    bool isMatch = false;
+    for (i = 0; i < len; i++)
     {
-        /* Buffer all values in private array. */
-        ch = (char)d[i];
-        self->shellycontent[i] = ch;
-        //DBGPRINT(String(ch));
+        for(uint8_t j = 0; (char)d[i+j] == searchTag[j]; j++)
+        {
 
+            if(j==SEARCH_TAG_LEN-2)
+            {
+                // DBGPRINT(F("\n Match \n"));
+                isMatch = true;
+
+                for(uint8_t x=0; x < STRING_POWER_LEN; x++)
+                {
+                    char ch = (char)d[i+j+3+x];
+                    DBGPRINT("X = " + String(ch));
+                    DBGPRINT("\n");
+
+                    if(true == isDigit(d[i+j+3+x]))
+                    {
+                        char ch = (char)d[i+j+3+x];
+                        strPower[x] = ch;
+                        isValid = true;
+                    }
+                    else
+                    {
+                        strPower[x] = '\0';
+                        if (x < 2)
+                        {
+                            /* Power value is tooo low. */
+                            isValid = false;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
     }
 
-    /* Set array index to next value! */
-    self->shellycontent_index = i+1;
+    if(true == isMatch)
+    {
+        if (true == isValid )
+        {
+            /* Convert strPower to a uint16_t number. */
+            self->lastPowerValue = std::strtoul(strPower, nullptr, 10);
+        }
+        else
+        {
+            /* Power value is tooo low. Set it to 0. */
+            self->lastPowerValue = 0;
+        }
+    }
+    else
+    {
+        /* Keep the value like it is. */
+    }
+
+
+    // DBGPRINTLN("String Power: " + String(strPower));
+    // DBGPRINTLN("String number: " + String(self->lastPowerValue));
     self->connectionOK = true;
 }
