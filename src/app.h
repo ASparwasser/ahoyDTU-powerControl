@@ -46,6 +46,7 @@ typedef Web<HmSystemType> WebType;
 typedef RestApi<HmSystemType> RestApiType;
 typedef PubMqtt<HmSystemType> PubMqttType;
 typedef PubSerial<HmSystemType> PubSerialType;
+typedef powerControl<HmSystemType> powerControlType;
 
 // PLUGINS
 #if defined(ENA_NOKIA) || defined(ENA_SSD1306)
@@ -245,7 +246,7 @@ class app : public IApp, public ah::Scheduler {
         #if defined(ENA_NOKIA) || defined(ENA_SSD1306)
         MonoDisplayType mMonoDisplay;
         #endif
-        powerControl activePowerLimiter;
+        powerControlType activePowerLimiter;
 };
 
 #endif /*__APP_H__*/

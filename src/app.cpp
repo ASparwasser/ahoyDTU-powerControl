@@ -11,6 +11,7 @@
 #include "app.h"
 #include <ArduinoJson.h>
 #include "utils/sun.h"
+#include "plugins/activePowerControl/powerControl.cpp"
 
 //-----------------------------------------------------------------------------
 app::app() : ah::Scheduler() {}
@@ -79,8 +80,8 @@ void app::setup() {
     everySec(std::bind(&MonoDisplayType::tickerSecond, &mMonoDisplay));
     #endif
 
-    activePowerLimiter.setup(mConfig);
-    everySec(std::bind(&powerControl::tickPowerControlLoop_1s, &activePowerLimiter));
+    activePowerLimiter.setup(mSys, mConfig);
+    everySec(std::bind(&powerControl<HmSystemType>::tickPowerControlLoop_1s, &activePowerLimiter));
 
     mPubSerial.setup(mConfig, mSys, &mTimestamp);
     every(std::bind(&PubSerialType::tick, &mPubSerial), mConfig->serial.interval);

@@ -11,16 +11,17 @@
 enum{SEARCH_TAG_LEN = 12};
 static const char searchTag[SEARCH_TAG_LEN] = "total_power";
 
-
-void powerControl::setup(settings_t* config)
+template<class HMSYSTEM>
+void powerControl<HMSYSTEM>::setup(HMSYSTEM *_sys, settings_t *config)
 {
-
+    sys     = _sys;
     mConfig = config;
 
     lastPowerValue = 255;
 }
 
-void powerControl::tickPowerControlLoop_1s(void)
+template<class HMSYSTEM>
+void powerControl<HMSYSTEM>::tickPowerControlLoop_1s(void)
 {
 
     static uint8_t called = 0;
@@ -44,44 +45,53 @@ void powerControl::tickPowerControlLoop_1s(void)
 
 }
 
-void powerControl::runAsyncClient(void)
+template<class HMSYSTEM>
+void powerControl<HMSYSTEM>::runAsyncClient(void)
 {
-    AsyncClient * client = aClient;
-    aClient = NULL;
-    delete client;
-    aClient = new AsyncClient();
-
-    if(!aClient)//could not allocate client
-        return;
-
-    aClient->onError(&powerControl::client_onError, this);
-    aClient->onConnect(&powerControl::client_onConnect, this);
-    aClient->onDisconnect(&powerControl::client_onDisconnect, this);
-    aClient->onData(&powerControl::client_onData, this);
-
-    if(!aClient->connect("192.168.178.158", 80))
+    if (accessingServer == false)
     {
-        DBGPRINTLN(F("Connect Fail"));
         AsyncClient * client = aClient;
         aClient = NULL;
         delete client;
+        aClient = new AsyncClient();
+
+        if(!aClient)//could not allocate client
+            return;
+
+        aClient->onError(&powerControl::client_onError, this);
+        aClient->onConnect(&powerControl::client_onConnect, this);
+        aClient->onDisconnect(&powerControl::client_onDisconnect, this);
+        aClient->onData(&powerControl::client_onData, this);
+
+        if(!aClient->connect("192.168.178.158", 80))
+        {
+            DBGPRINTLN(F("Connect Fail"));
+            AsyncClient * client = aClient;
+            aClient = NULL;
+            delete client;
+        }
+        else
+        {
+            accessingServer = true;
+        }
     }
+
 }
 
-
-void powerControl::client_onError(void* arg, AsyncClient* client, err_t error)
+template<class HMSYSTEM>
+void powerControl<HMSYSTEM>::client_onError(void* arg, AsyncClient* client, err_t error)
 {
-    powerControl* self = static_cast<powerControl*>(arg);
+    // powerControl* self = static_cast<powerControl*>(arg);
+
+    accessingServer = false;
 
     DBGPRINT(F("POWERCONTROL Connect Error: "));
     DBGPRINT(String(error));
     DBGPRINT(F("\n"));
-
-    self->aClient = NULL;
-    delete client;
 }
 
-void powerControl::client_onConnect(void* arg, AsyncClient* client)
+template<class HMSYSTEM>
+void powerControl<HMSYSTEM>::client_onConnect(void* arg, AsyncClient* client)
 {
     powerControl* self = static_cast<powerControl*>(arg);
 
@@ -91,16 +101,19 @@ void powerControl::client_onConnect(void* arg, AsyncClient* client)
     self->aClient->write("GET /status HTTP/1.1\r\n");
     self->aClient->write("Host: 192.168.178.158\r\n");
     self->aClient->write("\r\n");
-
 }
 
-void powerControl::client_onDisconnect(void* arg, AsyncClient* client)
+template<class HMSYSTEM>
+void powerControl<HMSYSTEM>::client_onDisconnect(void* arg, AsyncClient* client)
 {
-    powerControl* self = static_cast<powerControl*>(arg);
-    self->aClient = NULL;
+    // powerControl* self = static_cast<powerControl*>(arg);
+    // self->aClient = NULL;
+
+    accessingServer = false;
 }
 
-void powerControl::client_onData(void * arg, AsyncClient * c, void * data, size_t len)
+template<class HMSYSTEM>
+void powerControl<HMSYSTEM>::client_onData(void * arg, AsyncClient * c, void * data, size_t len)
 {
     powerControl* self = static_cast<powerControl*>(arg);
 
@@ -168,6 +181,7 @@ void powerControl::client_onData(void * arg, AsyncClient * c, void * data, size_
         /* Keep the value like it is. */
     }
 
+    accessingServer = false;
 
     // DBGPRINTLN("String Power: " + String(strPower));
      DBGPRINTLN("POWERCONTROL total power: " + String(self->lastPowerValue));

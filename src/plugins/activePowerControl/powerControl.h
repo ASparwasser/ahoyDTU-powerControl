@@ -8,15 +8,16 @@
 
 #include "../../config/settings.h"
 #include <ESPAsyncTCP.h>
-#include "hm/hmInverter.h"
+#include "appInterface.h"
 
+template<class HMSYSTEM>
 class powerControl{
     public:
 
     powerControl() { /* Not shure what to do here? */ }
 
     /* Implemented memeber functions. */
-    void setup(settings_t *config);
+    void setup(HMSYSTEM *_sys, settings_t *config);
     void tickPowerControlLoop_1s(void);
     void runAsyncClient(void);
 
@@ -25,11 +26,13 @@ class powerControl{
     static void client_onDisconnect(void *arg, AsyncClient *client);
     static void client_onData(void * arg, AsyncClient * c, void * data, size_t len);
 
-    //private:
+private:
     settings_t *mConfig;
     AsyncClient * aClient = NULL;
+    bool accessingServer;
+    HMSYSTEM *sys;
 
-    uint16_t lastPowerValue;
+    int16_t lastPowerValue;
 };
 
 
