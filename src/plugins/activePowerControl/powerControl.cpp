@@ -31,6 +31,7 @@ void powerControl<HMSYSTEM>::tickPowerControlLoop_1s(void)
     {
         /* initiate fetching of last powerValue.*/
         runAsyncClient();
+        DBGPRINTLN("POWERCONTROL total power: " + String(lastPowerValue));
     }
 
     // if(called%11 == 0)
@@ -81,9 +82,8 @@ void powerControl<HMSYSTEM>::runAsyncClient(void)
 template<class HMSYSTEM>
 void powerControl<HMSYSTEM>::client_onError(void* arg, AsyncClient* client, err_t error)
 {
-    // powerControl* self = static_cast<powerControl*>(arg);
-
-    accessingServer = false;
+     powerControl* self = static_cast<powerControl*>(arg);
+    self->accessingServer = false;
 
     DBGPRINT(F("POWERCONTROL Connect Error: "));
     DBGPRINT(String(error));
@@ -95,7 +95,7 @@ void powerControl<HMSYSTEM>::client_onConnect(void* arg, AsyncClient* client)
 {
     powerControl* self = static_cast<powerControl*>(arg);
 
-    DBGPRINTLN(F("POWERCONTROL: Connected to PowerMeasurement unit."));
+    // DBGPRINTLN(F("POWERCONTROL: Connected to PowerMeasurement unit."));
 
     //send the request
     self->aClient->write("GET /status HTTP/1.1\r\n");
@@ -106,10 +106,8 @@ void powerControl<HMSYSTEM>::client_onConnect(void* arg, AsyncClient* client)
 template<class HMSYSTEM>
 void powerControl<HMSYSTEM>::client_onDisconnect(void* arg, AsyncClient* client)
 {
-    // powerControl* self = static_cast<powerControl*>(arg);
-    // self->aClient = NULL;
-
-    accessingServer = false;
+    powerControl* self = static_cast<powerControl*>(arg);
+    self->accessingServer = false;
 }
 
 template<class HMSYSTEM>
@@ -181,8 +179,7 @@ void powerControl<HMSYSTEM>::client_onData(void * arg, AsyncClient * c, void * d
         /* Keep the value like it is. */
     }
 
-    accessingServer = false;
+    self->accessingServer = false;
 
     // DBGPRINTLN("String Power: " + String(strPower));
-     DBGPRINTLN("POWERCONTROL total power: " + String(self->lastPowerValue));
 }
