@@ -6,6 +6,7 @@
 #include "powerControl.h"
 #include "../../utils/dbg.h"
 #include <string>
+#include "hm/hmInverter.h"
 
 
 enum{SEARCH_TAG_LEN = 12};
@@ -17,7 +18,11 @@ void powerControl<HMSYSTEM>::setup(HMSYSTEM *_sys, settings_t *config)
     sys     = _sys;
     mConfig = config;
 
-    lastPowerValue = 255;
+    actualPowerValue = 0;
+    lastPowerValue = 0;
+    controlledValueMeasurement = 0;
+    maxInverter_P_out = 65535;
+
 }
 
 template<class HMSYSTEM>
@@ -27,23 +32,53 @@ void powerControl<HMSYSTEM>::tickPowerControlLoop_1s(void)
     static uint8_t called = 0;
     called ++;
 
-    if(called%10 == 0)
+    if (called%10 == 0)
     {
         /* initiate fetching of last powerValue.*/
         runAsyncClient();
-        DBGPRINTLN("POWERCONTROL total power: " + String(lastPowerValue));
+        DBGPRINTLN("POWERCONTROL total power: " + String(controlledValueMeasurement));
     }
 
-    // if(called%11 == 0)
-    // {
-    //     /* Do not care if the value is already fetched,
-    //      * use existing value to limit inverter.*/
-    //     Inverter<> *iv = mSys->getInverterByPos(jsonIn[F("id")]);
-    //     iv->powerLimit[1] = AbsolutNonPersistent;
-    //     iv->devControlCmd = ActivePowerContr;
-    //     iv->devControlRequest = true;
-    // }
+    if (called%30 == 0)
+    {
+        /* Get latest inverter data. */
+        Inverter<> *iv = sys->getInverterByPos(0);
 
+        /* Calculate maximal possible power output of Inverter. */
+        if (lastPowerValue != 0)
+        {
+            /* Use some percentage calculation to calculate maximal Pout of inverter
+             * iv->actPowerLimit contains percentage of currently active powerlimitation. */
+            maxInverter_P_out = ((100000 / iv->actPowerLimit) * lastPowerValue) / 1000;
+        }
+
+        /* Do not care if the value is already fetched,
+         * use existing value to limit inverter.*/
+        actualPowerValue = lastPowerValue + controlledValueMeasurement;
+
+        /* Anti windup measurements. */
+        if (actualPowerValue > maxInverter_P_out)
+        {
+            actualPowerValue = maxInverter_P_out;
+        }
+        else if(actualPowerValue < 0)
+        {
+            actualPowerValue = 0;
+        }
+        else
+        {
+            /* Do nothing. */
+        }
+
+        iv->powerLimit[0] = actualPowerValue;
+        iv->powerLimit[1] = AbsolutNonPersistent;
+        iv->devControlCmd = ActivePowerContr;
+        iv->devControlRequest = true;
+
+        DBGPRINTLN("POWERCONTROL HM Set to W: " + String(iv->powerLimit[0]));
+        DBGPRINTLN("POWERCONTROL HM maxpower: " + String(maxInverter_P_out));
+        lastPowerValue = actualPowerValue;
+    }
 }
 
 template<class HMSYSTEM>
@@ -166,12 +201,12 @@ void powerControl<HMSYSTEM>::client_onData(void * arg, AsyncClient * c, void * d
         if (true == isValid )
         {
             /* Convert strPower to a uint16_t number. */
-            self->lastPowerValue = std::strtoul(strPower, nullptr, 10);
+            self->controlledValueMeasurement = std::strtoul(strPower, nullptr, 10);
         }
         else
         {
             /* Power value is tooo low. Set it to 0. */
-            self->lastPowerValue = 0;
+            self->controlledValueMeasurement = 0;
         }
     }
     else

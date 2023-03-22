@@ -33,6 +33,9 @@ private:
     HMSYSTEM *sys;
 
     int16_t lastPowerValue;
+    int16_t actualPowerValue;
+    int16_t controlledValueMeasurement;
+    uint16_t maxInverter_P_out;
 };
 
 
