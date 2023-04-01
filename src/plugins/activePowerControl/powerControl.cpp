@@ -20,7 +20,7 @@ void powerControl<HMSYSTEM>::setup(HMSYSTEM *_sys, settings_t *config)
 
     actualPowerValue = 0;
     lastPowerValue = 0;
-    controlledValueMeasurement = 0;
+    controlledValueIndex = 1;
     maxInverter_P_out = 65535;
 
 }
@@ -32,29 +32,37 @@ void powerControl<HMSYSTEM>::tickPowerControlLoop_1s(void)
     static uint8_t called = 0;
     called ++;
 
-    if (called%10 == 0)
+    if (called%15 == 0)
     {
         /* initiate fetching of last powerValue.*/
         runAsyncClient();
-        DBGPRINTLN("POWERCONTROL total power: " + String(controlledValueMeasurement));
+
+        measUnitResponseReceived = false;
     }
 
-    if (called%30 == 0)
+    if (measUnitResponseReceived == true)
     {
+        DBGPRINTLN("POWERCONTROL total power: " + String(controlledValueMeasurement[0]));
+
         /* Get latest inverter data. */
         Inverter<> *iv = sys->getInverterByPos(0);
 
         /* Calculate maximal possible power output of Inverter. */
-        if (lastPowerValue != 0)
+        if (lastPowerValue != 0 && iv->actPowerLimit != 0)
         {
             /* Use some percentage calculation to calculate maximal Pout of inverter
              * iv->actPowerLimit contains percentage of currently active powerlimitation. */
             maxInverter_P_out = ((100000 / iv->actPowerLimit) * lastPowerValue) / 1000;
+
+            if (maxInverter_P_out < 300)
+            {
+                maxInverter_P_out = 300;
+            }
         }
 
         /* Do not care if the value is already fetched,
          * use existing value to limit inverter.*/
-        actualPowerValue = lastPowerValue + controlledValueMeasurement;
+        actualPowerValue = lastPowerValue + controlledValueMeasurement[0];
 
         /* Anti windup measurements. */
         if (actualPowerValue > maxInverter_P_out)
@@ -78,6 +86,8 @@ void powerControl<HMSYSTEM>::tickPowerControlLoop_1s(void)
         DBGPRINTLN("POWERCONTROL HM Set to W: " + String(iv->powerLimit[0]));
         DBGPRINTLN("POWERCONTROL HM maxpower: " + String(maxInverter_P_out));
         lastPowerValue = actualPowerValue;
+
+        measUnitResponseReceived = false;
     }
 }
 
@@ -159,6 +169,8 @@ void powerControl<HMSYSTEM>::client_onData(void * arg, AsyncClient * c, void * d
     char strPower[STRING_POWER_LEN];
     bool isValid = false;
     bool isMatch = false;
+    bool isNegative = false;
+
     for (i = 0; i < len; i++)
     {
         for(uint8_t j = 0; (char)d[i+j] == searchTag[j]; j++)
@@ -171,19 +183,26 @@ void powerControl<HMSYSTEM>::client_onData(void * arg, AsyncClient * c, void * d
 
                 for(uint8_t x=0; x < STRING_POWER_LEN; x++)
                 {
-                    // char ch = (char)d[i+j+3+x];
+                    //char ch = (char)d[i+j+3+x];
                     // DBGPRINT("X = " + String(ch));
                     // DBGPRINT("\n");
 
-                    if(true == isDigit(d[i+j+3+x]))
+                    if (d[i+j+3+x] == 45)
+                    {
+                        /* Value is negative. */
+                        isNegative = true;
+                        isValid = true;
+                        // DBGPRINTLN("IsNegative = " + String(ch));
+                    }
+                    else if(true == isDigit(d[i+j+3+x]))
                     {
                         char ch = (char)d[i+j+3+x];
-                        strPower[x] = ch;
+                        strPower[x-isNegative] = ch;
                         isValid = true;
                     }
                     else
                     {
-                        strPower[x] = '\0';
+                        strPower[x-isNegative] = '\0';
                         if (x < 2)
                         {
                             /* Power value is tooo low. */
@@ -201,20 +220,42 @@ void powerControl<HMSYSTEM>::client_onData(void * arg, AsyncClient * c, void * d
         if (true == isValid )
         {
             /* Convert strPower to a uint16_t number. */
-            self->controlledValueMeasurement = std::strtoul(strPower, nullptr, 10);
+            self->controlledValueMeasurement[self->controlledValueIndex] = std::strtoul(strPower, nullptr, 10);
+            if (true == isNegative)
+            {
+                self->controlledValueMeasurement[self->controlledValueIndex] *= (-1);
+            }
+
+            DBGPRINTLN("String Power: " + String(strPower));
+            DBGPRINTLN("Number Power: " + String(self->controlledValueMeasurement[self->controlledValueIndex]));
         }
         else
         {
             /* Power value is tooo low. Set it to 0. */
-            self->controlledValueMeasurement = 0;
+            self->controlledValueMeasurement[self->controlledValueIndex] = 0;
+            DBGPRINTLN("String Power set to 0");
         }
+
+        /* Increase Index. */
+        self->controlledValueIndex++;
+        if (self->controlledValueIndex == FILTER_SIZE)
+        {
+            self->controlledValueIndex = 1;
+        }
+
+        /* Calculate mean value and set it to position 0. */
+        self->controlledValueMeasurement[0] = 0;
+        for (i = 1; i < FILTER_SIZE; i++)
+        {
+            self->controlledValueMeasurement[0] += self->controlledValueMeasurement[i];
+        }
+        self->controlledValueMeasurement[0] = self->controlledValueMeasurement[0] / FILTER_SIZE;
     }
     else
     {
         /* Keep the value like it is. */
     }
 
+    self->measUnitResponseReceived = true;
     self->accessingServer = false;
-
-    // DBGPRINTLN("String Power: " + String(strPower));
 }

@@ -30,11 +30,14 @@ private:
     settings_t *mConfig;
     AsyncClient * aClient = NULL;
     bool accessingServer;
+    bool measUnitResponseReceived;
     HMSYSTEM *sys;
 
+    enum{FILTER_SIZE = 6};
     int16_t lastPowerValue;
     int16_t actualPowerValue;
-    int16_t controlledValueMeasurement;
+    int16_t controlledValueMeasurement[FILTER_SIZE]= {0,0,0,0,0,0};
+    uint8_t controlledValueIndex;
     uint16_t maxInverter_P_out;
 };
 
