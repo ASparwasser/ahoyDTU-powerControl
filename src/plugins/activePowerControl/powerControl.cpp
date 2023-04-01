@@ -9,8 +9,13 @@
 #include "hm/hmInverter.h"
 
 
+
+
 enum{SEARCH_TAG_LEN = 12};
 static const char searchTag[SEARCH_TAG_LEN] = "total_power";
+
+template<class HMSYSTEM>
+String powerControl<HMSYSTEM>::str_ipMeasUnit;
 
 template<class HMSYSTEM>
 void powerControl<HMSYSTEM>::setup(HMSYSTEM *_sys, settings_t *config)
@@ -24,6 +29,7 @@ void powerControl<HMSYSTEM>::setup(HMSYSTEM *_sys, settings_t *config)
     maxInverter_P_out = 65535;
 
 }
+
 
 template<class HMSYSTEM>
 void powerControl<HMSYSTEM>::tickPowerControlLoop_1s(void)
@@ -43,15 +49,18 @@ void powerControl<HMSYSTEM>::tickPowerControlLoop_1s(void)
     if (measUnitResponseReceived == true)
     {
         DBGPRINTLN("POWERCONTROL total power: " + String(controlledValueMeasurement[0]));
+        DBGPRINTLN("POWERCONTROL IP MEAS: " + String(str_ipMeasUnit));
 
         /* Get latest inverter data. */
         Inverter<> *iv = sys->getInverterByPos(0);
 
-        /* Calculate maximal possible power output of Inverter. */
+        if (iv != nullptr)
+        {
+            /* Calculate maximal possible power output of Inverter. */
         if (lastPowerValue != 0 && iv->actPowerLimit != 0)
         {
             /* Use some percentage calculation to calculate maximal Pout of inverter
-             * iv->actPowerLimit contains percentage of currently active powerlimitation. */
+            * iv->actPowerLimit contains percentage of currently active powerlimitation. */
             maxInverter_P_out = ((100000 / iv->actPowerLimit) * lastPowerValue) / 1000;
 
             if (maxInverter_P_out < 300)
@@ -61,7 +70,7 @@ void powerControl<HMSYSTEM>::tickPowerControlLoop_1s(void)
         }
 
         /* Do not care if the value is already fetched,
-         * use existing value to limit inverter.*/
+        * use existing value to limit inverter.*/
         actualPowerValue = lastPowerValue + controlledValueMeasurement[0];
 
         /* Anti windup measurements. */
@@ -88,6 +97,7 @@ void powerControl<HMSYSTEM>::tickPowerControlLoop_1s(void)
         lastPowerValue = actualPowerValue;
 
         measUnitResponseReceived = false;
+        }
     }
 }
 
@@ -122,6 +132,12 @@ void powerControl<HMSYSTEM>::runAsyncClient(void)
         }
     }
 
+}
+
+template <class HMSYSTEM>
+void powerControl<HMSYSTEM>::set_ipMeasUnit(String ip)
+{
+    str_ipMeasUnit = ip;
 }
 
 template<class HMSYSTEM>

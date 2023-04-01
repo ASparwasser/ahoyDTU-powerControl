@@ -13,6 +13,9 @@
 #include "../utils/helper.h"
 
 #include "../appInterface.h"
+#include "plugins/activePowerControl/powerControl.h"
+
+
 
 template<class HMSYSTEM>
 class RestApi {
@@ -510,10 +513,24 @@ class RestApi {
 
         bool setCtrl(JsonObject jsonIn, JsonObject jsonOut) {
             Inverter<> *iv = mSys->getInverterByPos(jsonIn[F("id")]);
+
+            DBGPRINTLN("stctrl called!");
+            if(F("ipMeasUnit_") == jsonIn[F("cmd")]) {
+                // str_ipMeasUnit = jsonIn["ip"].as<const char*>();
+                // powerControl::set_ipMeasUnit((jsonIn[F("val")].as<String>()));
+                powerControl<HMSYSTEM>::set_ipMeasUnit((jsonIn[F("val")].as<String>()));
+                //  powerControl<HMSYSTEM>::set_ipMeasUnit("Arturo");
+                DBGPRINTLN("call static function!");
+
+                return true;
+            }
+
             if(NULL == iv) {
                 jsonOut[F("error")] = F("inverter index invalid: ") + jsonIn[F("id")].as<String>();
                 return false;
             }
+
+            DBGPRINTLN("success!");
 
             if(F("power") == jsonIn[F("cmd")]) {
                 iv->devControlCmd = (jsonIn[F("val")] == 1) ? TurnOn : TurnOff;
@@ -540,6 +557,7 @@ class RestApi {
                 iv->enqueCommand<InfoCommand>(jsonIn[F("val")].as<int>());
             }
             else {
+                DBGPRINTLN("enter error else!");
                 jsonOut[F("error")] = F("unknown cmd: '") + jsonIn["cmd"].as<String>() + "'";
                 return false;
             }

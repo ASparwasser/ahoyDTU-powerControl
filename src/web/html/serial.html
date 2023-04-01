@@ -42,7 +42,16 @@
                     </select>
                     <br/>
                     <input type="button" value="Send Power Limit" class="btn" id="sendpwrlim"/>
+
                     <div class="hr mt-3 mb-3"></div>
+
+                    <label for="ipMeasUnit">IP Adress of MeasurementUnit</label>
+                    <input type="text" class="text" name="ipMeasUnit" maxlength="100"/>
+                    <br>
+                    <input type="button" value="Set IP" class="btn" id="setIPadress"/>
+
+                    <div class="hr mt-3 mb-3"></div>
+
                     <div id="power" class="mt-3">
                         <input type="button" value="Restart" class="btn" id="restart"/>
                         <input type="button" value="Turn Off" class="btn" id="power_off"/>
@@ -189,6 +198,20 @@
                 var obj = new Object();
                 obj.id = get_selected_iv();
                 obj.cmd = cmd;
+                obj.val = val;
+                getAjax("/api/ctrl", ctrlCb, "POST", JSON.stringify(obj));
+            });
+
+            document.getElementById("setIPadress").addEventListener("click", function() {
+                var val = document.getElementsByName('ipMeasUnit')[0].innerText;
+
+                if(isNaN(val)) {
+                    document.getElementById("result").textContent = "value is missing";
+                    return;
+                }
+
+                var obj = new Object();
+                obj.cmd = "ipMeasUnit_";
                 obj.val = val;
                 getAjax("/api/ctrl", ctrlCb, "POST", JSON.stringify(obj));
             });

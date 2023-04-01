@@ -10,6 +10,8 @@
 #include <ESPAsyncTCP.h>
 #include "appInterface.h"
 
+
+
 template<class HMSYSTEM>
 class powerControl{
     public:
@@ -21,12 +23,16 @@ class powerControl{
     void tickPowerControlLoop_1s(void);
     void runAsyncClient(void);
 
+    static void set_ipMeasUnit(String s);
+
     static void client_onError(void *arg, AsyncClient *client, err_t error);
     static void client_onConnect(void *arg, AsyncClient *client);
     static void client_onDisconnect(void *arg, AsyncClient *client);
     static void client_onData(void * arg, AsyncClient * c, void * data, size_t len);
 
 private:
+    static String str_ipMeasUnit;
+
     settings_t *mConfig;
     AsyncClient * aClient = NULL;
     bool accessingServer;
