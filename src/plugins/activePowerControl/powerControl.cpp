@@ -32,15 +32,14 @@ void powerControl<HMSYSTEM>::tickPowerControlLoop_1s(void)
     static uint8_t called = 0;
     called ++;
 
-    if (called%15 == 0)
+    if (called%5 == 0)
     {
         /* initiate fetching of last powerValue.*/
         runAsyncClient();
-
-        measUnitResponseReceived = false;
     }
 
-    if (measUnitResponseReceived == true)
+
+    if (called%30 == 0 && measUnitResponseReceived == true)
     {
         DBGPRINTLN("POWERCONTROL total power: " + String(controlledValueMeasurement[0]));
 
@@ -73,6 +72,12 @@ void powerControl<HMSYSTEM>::tickPowerControlLoop_1s(void)
         {
             actualPowerValue = 0;
         }
+        else if ((lastPowerValue - actualPowerValue) < 25 && (lastPowerValue - actualPowerValue) > (-25))
+        {
+            DBGPRINTLN("POWERCONTROL Value too small --> nochange");
+            measUnitResponseReceived = false;
+            return;
+        }
         else
         {
             /* Do nothing. */
@@ -82,6 +87,7 @@ void powerControl<HMSYSTEM>::tickPowerControlLoop_1s(void)
         iv->powerLimit[1] = AbsolutNonPersistent;
         iv->devControlCmd = ActivePowerContr;
         iv->devControlRequest = true;
+
 
         DBGPRINTLN("POWERCONTROL HM Set to W: " + String(iv->powerLimit[0]));
         DBGPRINTLN("POWERCONTROL HM maxpower: " + String(maxInverter_P_out));
